@@ -29,15 +29,88 @@ async def get_detailed_session_info(ctx: Context) -> dict:
     """
     获取详细的会话信息
     """
+    # 获取基本会话信息
     session_info = {
         "session_id": ctx.session_id,
         "request_id": ctx.request_id,
         "client_id": ctx.client_id if hasattr(ctx, 'client_id') else "N/A"
     }
     
+    # 尝试获取更多上下文信息
+    try:
+        # 获取可用的工具、资源和提示
+        tools = await ctx.list_tools() if hasattr(ctx, 'list_tools') else "N/A"
+        resources = await ctx.list_resources() if hasattr(ctx, 'list_resources') else "N/A"
+        prompts = await ctx.list_prompts() if hasattr(ctx, 'list_prompts') else "N/A"
+        
+        session_info.update({
+            "available_tools": [tool.name for tool in tools] if tools != "N/A" else "N/A",
+            "available_resources": [resource.uri for resource in resources] if resources != "N/A" else "N/A",
+            "available_prompts": [prompt.name for prompt in prompts] if prompts != "N/A" else "N/A"
+        })
+    except Exception as e:
+        session_info["error"] = f"获取详细信息时出错: {str(e)}"
+    
     return session_info
 
 
+@mcp.tool
+async def get_session_content(ctx: Context) -> dict:
+    """
+    获取会话中的具体内容，包括工具、资源和提示信息的详细内容
+    """
+    content = {
+        "session_id": ctx.session_id,
+        "request_id": ctx.request_id,
+        "tools_details": {},
+        "resources_details": {},
+        "prompts_details": {}
+    }
+    
+    try:
+        # 获取工具详情
+        tools = await ctx.list_tools() if hasattr(ctx, 'list_tools') else []
+        content["tools_details"] = {
+            "count": len(tools),
+            "tools": [tool.dict() for tool in tools] if tools else []
+        }
+        
+        # 获取资源详情
+        resources = await ctx.list_resources() if hasattr(ctx, 'list_resources') else []
+        content["resources_details"] = {
+            "count": len(resources),
+            "resources": [resource.dict() for resource in resources] if resources else []
+        }
+        
+        # 获取提示详情
+        prompts = await ctx.list_prompts() if hasattr(ctx, 'list_prompts') else []
+        content["prompts_details"] = {
+            "count": len(prompts),
+            "prompts": [prompt.dict() for prompt in prompts] if prompts else []
+        }
+        
+        # 获取状态信息
+        content["state"] = getattr(ctx, '_state', {})
+        
+    except Exception as e:
+        content["error"] = f"获取会话内容时出错: {str(e)}"
+    
+    return content
+
+
 if __name__ == "__main__":
+    # 添加一些示例工具和资源以便更好地演示
+    @mcp.tool
+    def example_tool(param: str) -> str:
+        return f"Example tool called with param: {param}"
+    
+    @mcp.resource("resource://example")
+    def example_resource() -> dict:
+        return {"data": "example resource data"}
+    
+    @mcp.prompt(name="example_prompt")
+    def example_prompt() -> str:
+        return "This is an example prompt"
+    
     # 运行MCP服务器
     mcp.run()
