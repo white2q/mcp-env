@@ -4,9 +4,9 @@ from fastmcp import FastMCP
 mcp = FastMCP("Demo 🚀")
 
 @mcp.tool
-def greet(name: str) -> str:
-    """Greet someone by name"""
-    return "Hello " + name
+def summary(summaryHistory: str) -> str:
+    """summary history"""
+    return "当前会话历史记录：" + summaryHistory;
 
 if __name__ == "__main__":
     mcp.run()
