@@ -279,7 +279,7 @@ def _generate_session_summary(session_id: str, history: List[Dict]) -> dict:
     }
 
 
-@mcp.tool
+@mcp.tool(name="session_summary_report")
 async def get_session_summary_report(ctx: Context) -> dict:
     """
     获取所有会话的摘要报告
@@ -308,7 +308,7 @@ async def get_session_summary_report(ctx: Context) -> dict:
     return report
 
 
-@mcp.tool
+@mcp.tool(name="clear_all_sessions")
 async def clear_all_session_histories(ctx: Context) -> dict:
     """
     清除所有会话历史记录
@@ -327,6 +327,93 @@ async def clear_all_session_histories(ctx: Context) -> dict:
         "cleared_sessions": session_count,
         "message": f"已清除 {session_count} 个会话的历史记录"
     }
+
+
+# 添加统一的会话管理入口工具
+@mcp.tool(name="use mcp-session-summary")
+async def session_manager(ctx: Context, action: str = "summary", session_id: str = None) -> dict:
+    """
+    统一会话管理工具 - 使用固定话术"use mcp-session-summary"触发
+    
+    Args:
+        ctx: 上下文对象
+        action: 执行操作，可选值:
+            - "summary": 获取当前会话摘要
+            - "detailed": 获取详细会话信息
+            - "content": 获取会话内容
+            - "history": 获取会话历史
+            - "export": 导出会话历史到桌面
+            - "report": 获取所有会话摘要报告
+            - "clear": 清除当前会话历史
+            - "clear_all": 清除所有会话历史
+        session_id: 特定会话ID（可选）
+    
+    Returns:
+        dict: 操作结果
+    """
+    try:
+        if action == "summary":
+            result = await get_session_summary(ctx)
+            return {"action": "summary", "result": result}
+        elif action == "detailed":
+            result = await get_detailed_session_info(ctx)
+            return {"action": "detailed", "result": result}
+        elif action == "content":
+            result = await get_session_content(ctx)
+            return {"action": "content", "result": result}
+        elif action == "history":
+            result = await get_session_history(ctx)
+            return {"action": "history", "result": result}
+        elif action == "export":
+            result = await export_session_history_to_desktop(ctx, session_id)
+            return {"action": "export", "result": result}
+        elif action == "report":
+            result = await get_session_summary_report(ctx)
+            return {"action": "report", "result": result}
+        elif action == "clear":
+            result = await clear_session_history(ctx)
+            return {"action": "clear", "result": result}
+        elif action == "clear_all":
+            result = await clear_all_session_histories(ctx)
+            return {"action": "clear_all", "result": result}
+        else:
+            return {"error": f"未知操作: {action}，支持的操作包括: summary, detailed, content, history, export, report, clear, clear_all"}
+    except Exception as e:
+        return {"error": f"执行操作时出错: {str(e)}"}
+
+
+# 添加使用说明工具
+@mcp.tool(name="mcp-session-summary help")
+async def session_summary_help(ctx: Context) -> str:
+    """
+    获取mcp-session-summary工具的使用帮助
+    """
+    help_text = """
+mcp-session-summary 使用说明:
+
+触发方式:
+- 使用固定话术 "use mcp-session-summary" 来调用会话管理功能
+
+支持的操作:
+- summary: 获取当前会话摘要
+- detailed: 获取详细会话信息
+- content: 获取会话内容
+- history: 获取会话历史
+- export: 导出会话历史到桌面
+- report: 获取所有会话摘要报告
+- clear: 清除当前会话历史
+- clear_all: 清除所有会话历史
+
+使用示例:
+- "use mcp-session-summary" - 默认获取当前会话摘要
+- "use mcp-session-summary with action export" - 导出会话历史
+- "use mcp-session-summary with action report" - 获取会话报告
+
+注意事项:
+- 导出的文件将保存在桌面
+- 所有操作均基于当前会话上下文
+    """
+    return help_text
 
 
 if __name__ == "__main__":
