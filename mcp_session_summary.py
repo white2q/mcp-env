@@ -1,8 +1,13 @@
 from fastmcp import FastMCP, Context
+from typing import Dict, List
+import json
 
 
 # 创建FastMCP实例
 mcp = FastMCP("Session Summary Server")
+
+# 存储会话历史的字典
+session_histories: Dict[str, List[Dict]] = {}
 
 
 @mcp.tool
@@ -96,6 +101,65 @@ async def get_session_content(ctx: Context) -> dict:
         content["error"] = f"获取会话内容时出错: {str(e)}"
     
     return content
+
+
+@mcp.tool
+async def record_session_history(ctx: Context, action: str, details: dict = None) -> str:
+    """
+    记录会话历史
+    
+    Args:
+        ctx: 上下文对象
+        action: 执行的操作
+        details: 操作详情
+    """
+    session_id = ctx.session_id
+    
+    # 初始化会话历史列表
+    if session_id not in session_histories:
+        session_histories[session_id] = []
+    
+    # 记录历史条目
+    history_entry = {
+        "request_id": ctx.request_id,
+        "action": action,
+        "details": details or {},
+        "timestamp": __import__('datetime').datetime.now().isoformat()
+    }
+    
+    session_histories[session_id].append(history_entry)
+    
+    return f"已记录会话历史: {action}"
+
+
+@mcp.tool
+async def get_session_history(ctx: Context) -> dict:
+    """
+    获取当前会话的历史记录
+    """
+    session_id = ctx.session_id
+    
+    # 获取会话历史
+    history = session_histories.get(session_id, [])
+    
+    return {
+        "session_id": session_id,
+        "history_count": len(history),
+        "history": history
+    }
+
+
+@mcp.tool
+async def clear_session_history(ctx: Context) -> str:
+    """
+    清除当前会话的历史记录
+    """
+    session_id = ctx.session_id
+    
+    if session_id in session_histories:
+        del session_histories[session_id]
+    
+    return "会话历史已清除"
 
 
 if __name__ == "__main__":
