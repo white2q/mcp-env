@@ -1,6 +1,8 @@
 from fastmcp import FastMCP, Context
 from typing import Dict, List
 import json
+import os
+from datetime import datetime
 
 
 # 创建FastMCP实例
@@ -124,7 +126,7 @@ async def record_session_history(ctx: Context, action: str, details: dict = None
         "request_id": ctx.request_id,
         "action": action,
         "details": details or {},
-        "timestamp": __import__('datetime').datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat()
     }
     
     session_histories[session_id].append(history_entry)
@@ -160,6 +162,171 @@ async def clear_session_history(ctx: Context) -> str:
         del session_histories[session_id]
     
     return "会话历史已清除"
+
+
+# 新增功能：将会话历史导出到桌面
+@mcp.tool
+async def export_session_history_to_desktop(ctx: Context, session_id: str = None) -> dict:
+    """
+    导出会话历史记录到桌面
+    
+    Args:
+        ctx: 上下文对象
+        session_id: 特定会话ID，如果未提供则导出所有会话
+    
+    Returns:
+        dict: 导出结果信息
+    """
+    try:
+        # 获取桌面路径
+        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+        if not os.path.exists(desktop_path):
+            # Windows系统可能使用不同的路径
+            desktop_path = os.path.join(os.path.expanduser("~"), "桌面")
+            if not os.path.exists(desktop_path):
+                return {"error": "无法找到桌面路径"}
+        
+        # 确定要导出的会话
+        sessions_to_export = {}
+        if session_id:
+            if session_id in session_histories:
+                sessions_to_export[session_id] = session_histories[session_id]
+            else:
+                return {"error": f"未找到会话ID: {session_id}"}
+        else:
+            sessions_to_export = session_histories
+        
+        # 生成文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if session_id:
+            filename = f"session_history_{session_id[:8]}_{timestamp}.json"
+        else:
+            filename = f"all_session_histories_{timestamp}.json"
+        
+        # 创建导出数据
+        export_data = {
+            "export_timestamp": timestamp,
+            "session_count": len(sessions_to_export),
+            "sessions": {}
+        }
+        
+        # 处理会话数据
+        for sid, history in sessions_to_export.items():
+            # 为每个会话生成摘要
+            session_summary = _generate_session_summary(sid, history)
+            
+            export_data["sessions"][sid] = {
+                "summary": session_summary,
+                "history_count": len(history),
+                "history": history
+            }
+        
+        # 写入文件
+        file_path = os.path.join(desktop_path, filename)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(export_data, f, ensure_ascii=False, indent=2)
+        
+        return {
+            "success": True,
+            "file_path": file_path,
+            "session_count": len(sessions_to_export),
+            "message": f"成功导出会话历史到: {file_path}"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"导出过程中发生错误: {str(e)}"
+        }
+
+
+def _generate_session_summary(session_id: str, history: List[Dict]) -> dict:
+    """
+    为会话生成摘要信息
+    
+    Args:
+        session_id: 会话ID
+        history: 会话历史记录列表
+    
+    Returns:
+        dict: 会话摘要信息
+    """
+    if not history:
+        return {
+            "session_id": session_id,
+            "total_actions": 0,
+            "summary": "空会话"
+        }
+    
+    # 统计操作类型
+    action_counts = {}
+    for entry in history:
+        action = entry.get("action", "unknown")
+        action_counts[action] = action_counts.get(action, 0) + 1
+    
+    # 获取时间范围
+    timestamps = [entry.get("timestamp", "") for entry in history if entry.get("timestamp")]
+    first_time = min(timestamps) if timestamps else "未知"
+    last_time = max(timestamps) if timestamps else "未知"
+    
+    return {
+        "session_id": session_id,
+        "total_actions": len(history),
+        "action_types": action_counts,
+        "first_action_time": first_time,
+        "last_action_time": last_time,
+        "summary": f"会话包含 {len(history)} 个操作，主要操作类型: {list(action_counts.keys())}"
+    }
+
+
+@mcp.tool
+async def get_session_summary_report(ctx: Context) -> dict:
+    """
+    获取所有会话的摘要报告
+    
+    Args:
+        ctx: 上下文对象
+    
+    Returns:
+        dict: 会话摘要报告
+    """
+    if not session_histories:
+        return {
+            "total_sessions": 0,
+            "message": "没有会话历史记录"
+        }
+    
+    report = {
+        "total_sessions": len(session_histories),
+        "sessions": []
+    }
+    
+    for session_id, history in session_histories.items():
+        summary = _generate_session_summary(session_id, history)
+        report["sessions"].append(summary)
+    
+    return report
+
+
+@mcp.tool
+async def clear_all_session_histories(ctx: Context) -> dict:
+    """
+    清除所有会话历史记录
+    
+    Args:
+        ctx: 上下文对象
+    
+    Returns:
+        dict: 操作结果
+    """
+    session_count = len(session_histories)
+    session_histories.clear()
+    
+    return {
+        "success": True,
+        "cleared_sessions": session_count,
+        "message": f"已清除 {session_count} 个会话的历史记录"
+    }
 
 
 if __name__ == "__main__":
