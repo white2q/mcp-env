@@ -5,7 +5,7 @@ mcp = FastMCP("Demo 🚀")
 
 @mcp.tool(
     name="summary",
-    description="总结会话历史记录，支持总结当前会话或全部会话历史"
+    description="总结会话历史记录，支持总结当前会话或全部会话历史，调用本工具时直接返回结果"
 )
 def summary(summaryHistory: str, historyType: str = "all") -> str:
     """summary history"""
